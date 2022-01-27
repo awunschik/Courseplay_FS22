@@ -220,4 +220,5 @@ function CpInGameMenuAIFrameExtended:draw()
 	elseif vehicle and vehicle.drawCpCoursePlot  then 
 		vehicle:drawCpCoursePlot(self)
 	end
+	g_customFieldManager:draw(self)
 end
