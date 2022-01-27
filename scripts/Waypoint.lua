@@ -1859,6 +1859,14 @@ end
 --- The attributes of individual waypoints are separated by a ';', the order of the attributes can be read from the
 --- code below.
 function Course:serializeWaypoints()
+	local serializedWaypoints = '\n' -- (pure cosmetic)
+	for _, p in ipairs(self.waypoints) do
+		serializedWaypoints = serializedWaypoints .. Course.serializeSingleWaypoint(p)
+	end
+	return serializedWaypoints
+end
+
+function Course.serializeSingleWaypoint(wp)
 	local function serializeBool(bool)
 		return bool and 'Y' or 'N'
 	end
@@ -1866,26 +1874,33 @@ function Course:serializeWaypoints()
 	local function serializeInt(number)
 		return number and string.format('%d', number) or ''
 	end
-
-	local serializedWaypoints = '\n' -- (pure cosmetic)
-	for _, p in ipairs(self.waypoints) do
-		-- we are going to celebrate once we get rid of the cx, cz variables!
-		local x, z = p.x or p.cx, p.z or p.cz
-		local y = getTerrainHeightAtWorldPos(g_currentMission.terrainRootNode, x, 0, z)
-		local turn = p.turnStart and 'S' or (p.turnEnd and 'E' or '')
-		local serializedWaypoint = string.format('%.2f %.2f %.2f;%.2f;%s;%s;',
-			x, y, z, p.angle, serializeInt(p.speed), turn)
-		serializedWaypoint = serializedWaypoint .. string.format('%s;%s;%s;%s;',
-			serializeBool(p.rev), serializeBool(p.unload), serializeBool(p.wait), serializeBool(p.crossing))
-		serializedWaypoint = serializedWaypoint .. string.format('%s;%s;%s;%s|\n',
-			serializeInt(p.lane), serializeInt(p.ridgeMarker),
-			serializeInt(p.headlandHeightForTurn), serializeBool(p.isConnectingTrack))
-		serializedWaypoints = serializedWaypoints .. serializedWaypoint
-	end
-	return serializedWaypoints
+	-- we are going to celebrate once we get rid of the cx, cz variables!
+	local x, z = wp.x or wp.cx, wp.z or wp.cz
+	local y = getTerrainHeightAtWorldPos(g_currentMission.terrainRootNode, x, 0, z)
+	local turn = wp.turnStart and 'S' or (wp.turnEnd and 'E' or '')
+	local serializedWaypoint = string.format('%.2f %.2f %.2f;%.2f;%s;%s;',
+		x, y, z, wp.angle, serializeInt(wp.speed), turn)
+	serializedWaypoint = serializedWaypoint .. string.format('%s;%s;%s;%s;',
+		serializeBool(wp.rev), serializeBool(wp.unload), serializeBool(wp.wait), serializeBool(wp.crossing))
+	serializedWaypoint = serializedWaypoint .. string.format('%s;%s;%s;%s|\n',
+		serializeInt(wp.lane), serializeInt(wp.ridgeMarker),
+		serializeInt(wp.headlandHeightForTurn), serializeBool(wp.isConnectingTrack))
+	return serializedWaypoint
 end
 
 function Course.deserializeWaypoints(serializedWaypoints)
+	local waypoints = {}
+	local lines = string.split(serializedWaypoints, '|')
+	for _, line in ipairs(lines) do
+		local p = Course.deserializeSingleWaypoint(line)
+		if p then 
+			table.insert(waypoints, p)
+		end
+	end
+	return waypoints
+end
+
+function Course.deserializeSingleWaypoint(line)
 	local function deserializeBool(str)
 		if str == 'Y' then
 			return true
@@ -1896,33 +1911,28 @@ function Course.deserializeWaypoints(serializedWaypoints)
 		end
 	end
 
-	local waypoints = {}
-
-	local lines = string.split(serializedWaypoints, '|')
-	for _, line in ipairs(lines) do
-		local p = {}
-		local fields = string.split(line,';')
-		p.x, p.y, p.z = string.getVector(fields[1])
-		-- just skip empty lines
-		if p.x then
-			p.angle = tonumber(fields[2])
-			p.speed = tonumber(fields[3])
-			local turn = fields[4]
-			p.turnStart = turn == 'S'
-			p.turnEnd = turn == 'E'
-			p.rev = deserializeBool(fields[5])
-			p.unload = deserializeBool(fields[6])
-			p.wait = deserializeBool(fields[7])
-			p.crossing = deserializeBool(fields[8])
-			p.lane = tonumber(fields[9])
-			p.ridgeMarker = tonumber(fields[10])
-			p.headlandHeightForTurn = tonumber(fields[11])
-			p.isConnectingTrack = deserializeBool(fields[12])
-			table.insert(waypoints, p)
-		end
+	local p = {}
+	local fields = string.split(line,';')
+	p.x, p.y, p.z = string.getVector(fields[1])
+	-- just skip empty lines
+	if p.x then
+		p.angle = tonumber(fields[2])
+		p.speed = tonumber(fields[3])
+		local turn = fields[4]
+		p.turnStart = turn == 'S'
+		p.turnEnd = turn == 'E'
+		p.rev = deserializeBool(fields[5])
+		p.unload = deserializeBool(fields[6])
+		p.wait = deserializeBool(fields[7])
+		p.crossing = deserializeBool(fields[8])
+		p.lane = tonumber(fields[9])
+		p.ridgeMarker = tonumber(fields[10])
+		p.headlandHeightForTurn = tonumber(fields[11])
+		p.isConnectingTrack = deserializeBool(fields[12])
+		return p
 	end
-	return waypoints
 end
+
 
 function Course:saveToXml(courseXml, courseKey)
 	courseXml:setValue(courseKey .. '#name',self.name)
@@ -1938,7 +1948,11 @@ function Course:writeStream(vehicle,streamId, connection)
 	streamWriteFloat32(streamId, self.workWidth or 0)
 	streamWriteInt32(streamId, self.numHeadlands or 0 )
 	streamWriteInt32(streamId, self.multiTools or 0)
-	streamWriteString(streamId, self:serializeWaypoints())
+	streamWriteInt32(streamId, self:getNumberOfWaypoints() or 0)
+	for _,p in ipairs(self.waypoints) do 
+		local line = Course.serializeSingleWaypoint(p)
+		streamWriteString(streamId,line)
+	end
 end
 
 ---@param vehicle  table
@@ -1967,8 +1981,16 @@ function Course.createFromStream(vehicle,streamId, connection)
 	local workWidth = streamReadFloat32(streamId)
 	local numHeadlands = streamReadInt32(streamId)
 	local multiTools = streamReadInt32(streamId)
-	local serializedWaypoints = streamReadString(streamId)
-	local course = Course(vehicle, Course.deserializeWaypoints(serializedWaypoints))
+	local numWps = streamReadInt32(streamId)
+	local waypoints = {}
+	for i=1,numWps do 
+		local line = streamReadString(streamId)
+		local p = Course.deserializeSingleWaypoint(line)
+		if p then 
+			table.insert(waypoints, p)
+		end
+	end
+	local course = Course(vehicle, waypoints)
 	course.name = name
 	course.workWidth = workWidth
 	course.numHeadlands = numHeadlands
