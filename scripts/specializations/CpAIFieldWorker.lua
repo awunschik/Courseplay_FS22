@@ -311,7 +311,9 @@ function CpAIFieldWorker:startStopDriver()
 		self:stopCurrentAIJob(AIMessageSuccessStoppedByUser.new())
         CpUtil.infoVehicle(self,"Stopped current helper.")
 	else
-        self:updateAIFieldWorkerImplementData()
+        if self.isServer then
+            self:updateAIFieldWorkerImplementData()
+        end
         if (self:hasCpCourse() and self:getCanStartCpFieldWork()) or self:getCanStartCpBaleFinder(spec.cpJob:getCpJobParameters()) then
             spec.cpJob:applyCurrentState(self, g_currentMission, g_currentMission.player.farmId, true)
             spec.cpJob:setValues()

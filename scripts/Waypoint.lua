@@ -1933,7 +1933,7 @@ function Course:saveToXml(courseXml, courseKey)
 	courseXml:setValue(courseKey  .. '.waypoints',self:serializeWaypoints())
 end
 
-function Course:writeStream(streamId, connection)
+function Course:writeStream(vehicle,streamId, connection)
 	streamWriteString(streamId, self.name)
 	streamWriteFloat32(streamId, self.workWidth or 0)
 	streamWriteInt32(streamId, self.numHeadlands or 0 )

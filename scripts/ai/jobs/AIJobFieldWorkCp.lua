@@ -11,7 +11,7 @@ AIJobFieldWorkCp.translations = {
 
 function AIJobFieldWorkCp.new(isServer, customMt)
 	local self = AIJobFieldWork.new(isServer, customMt or AIJobFieldWorkCp_mt)
-	
+	self.jobName = "FIELDWORK_CP"
 	self.fieldWorkTask = AITaskFieldWorkCp.new(isServer, self)
 	-- Switches the AITaskFieldWork with AITaskFieldWorkCp.
 	-- TODO: Consider deriving AIJobFieldWorkCp of AIJob and implement our own logic instead.
@@ -74,6 +74,16 @@ function AIJobFieldWorkCp:validate(farmId)
 	end
 	self.cpJobParameters:validateSettings()
 	return true, ''
+end
+
+function AIJobFieldWorkCp:writeStream(streamId, connection)
+	AIJobFieldWorkCp:superClass().writeStream(self, streamId, connection)
+	self.cpJobParameters:writeStream(streamId, connection)
+end
+
+function AIJobFieldWorkCp:readStream(streamId, connection)
+	AIJobFieldWorkCp:superClass().readStream(self, streamId, connection)
+	self.cpJobParameters:readStream(streamId, connection)
 end
 
 function AIJobFieldWorkCp:getCpJobParameters()
@@ -180,3 +190,14 @@ end
 function AIJobFieldWorkCp:setVehicle(v)
 	self.vehicle = v
 end
+
+function AIJobFieldWorkCp:getJobTypeIndex(superFunc,job)
+	local ret = superFunc(self,job)
+	if ret == nil then 
+		if job.jobName then 
+			return self.nameToIndex[job.jobName]
+		end
+	end
+	return ret
+end
+AIJobTypeManager.getJobTypeIndex = Utils.overwrittenFunction(AIJobTypeManager.getJobTypeIndex ,AIJobFieldWorkCp.getJobTypeIndex)

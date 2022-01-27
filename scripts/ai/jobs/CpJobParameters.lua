@@ -42,6 +42,18 @@ function CpJobParameters:validateSettings()
     end
 end
 
+function CpJobParameters:writeStream(streamId, connection)
+    for i,setting in ipairs(self.settings) do 
+        setting:writeStream(streamId, connection)
+    end
+end
+
+function CpJobParameters:readStream(streamId, connection)
+    for i,setting in ipairs(self.settings) do 
+        setting:readStream(streamId, connection)
+    end
+end
+
 function CpJobParameters:isBaleFinderNotAllowed()
     local vehicle = self.job:getVehicle()
     if vehicle then
